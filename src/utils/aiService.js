@@ -1,83 +1,185 @@
-export async function generateRoadmap(userInput) {
-  // Simulate network processing delay for realistic UX
-  await new Promise(resolve => setTimeout(resolve, 1500));
+const API_KEY = import.meta.env.VITE_AI_API_KEY;
 
+export async function generateRoadmap(userInput) {
   const role = userInput.role || "Software Engineer";
   const company = userInput.company || "Tech Startup";
-  const known = (userInput.knownSkills || "")
-    .toLowerCase()
-    .split(",")
-    .map(s => s.trim())
-    .filter(Boolean);
+  const knownSkills = userInput.knownSkills || "None provided";
 
-  const roleLower = role.toLowerCase();
-  let steps = [];
-
-  // Tailor step recommendations to domain keywords
-  if (roleLower.includes("ml") || roleLower.includes("machine learning") || roleLower.includes("data") || roleLower.includes("ai")) {
-    steps = [
-      { title: "Python & Data Science Stack", duration: "2 weeks", keyword: "python" },
-      { title: "Linear Algebra & Statistics", duration: "3 weeks", keyword: "sql" },
-      { title: "Machine Learning Math & Scikit-Learn", duration: "3 weeks", keyword: "math" },
-      { title: "Deep Learning Frameworks (PyTorch/TF)", duration: "4 weeks", keyword: "pytorch" },
-      { title: "Model Deployment & API Serving", duration: "3 weeks", keyword: "fastapi" },
-      { title: `Domain Project for ${company}`, duration: "2 weeks", keyword: "project" },
-    ];
-  } else if (roleLower.includes("front") || roleLower.includes("web") || roleLower.includes("react") || roleLower.includes("ui")) {
-    steps = [
-      { title: "HTML, CSS & Modern JS (ES6+)", duration: "2 weeks", keyword: "javascript" },
-      { title: "React.js Component Architecture", duration: "3 weeks", keyword: "react" },
-      { title: "State Management & API Integration", duration: "2 weeks", keyword: "state" },
-      { title: "UI/UX Systems & CSS Frameworks", duration: "2 weeks", keyword: "css" },
-      { title: `Production Project for ${company}`, duration: "3 weeks", keyword: "project" },
-    ];
-  } else if (roleLower.includes("back") || roleLower.includes("node") || roleLower.includes("system") || roleLower.includes("devops")) {
-    steps = [
-      { title: "Data Structures & Algorithms", duration: "3 weeks", keyword: "dsa" },
-      { title: "Node.js / Express Architecture", duration: "3 weeks", keyword: "node" },
-      { title: "SQL & NoSQL Database Design", duration: "2 weeks", keyword: "sql" },
-      { title: "System Design & Caching", duration: "3 weeks", keyword: "system" },
-      { title: `Scalable Backend for ${company}`, duration: "2 weeks", keyword: "project" },
-    ];
-  } else {
-    steps = [
-      { title: "Foundational Programming", duration: "2 weeks", keyword: "code" },
-      { title: "Core System Architecture", duration: "3 weeks", keyword: "core" },
-      { title: "Advanced Domain Concepts", duration: "3 weeks", keyword: "advanced" },
-      { title: "Industry Frameworks & Tooling", duration: "3 weeks", keyword: "framework" },
-      { title: `Targeted Portfolio Project for ${company}`, duration: "2 weeks", keyword: "project" },
-    ];
+  if (!API_KEY || API_KEY === "your-api-key-here") {
+    throw new Error("Gemini API key is missing.");
   }
 
-  // Dynamically create React Flow nodes
+  const prompt = `
+You are PathForge AI, an expert career roadmap planner.
+
+Create a realistic career roadmap for:
+
+Target Role: ${role}
+Target Company Type: ${company}
+Current Skills: ${knownSkills}
+
+Create exactly 6 milestones.
+
+Requirements:
+- Start from the user's current level.
+- Avoid repeating skills the user already knows.
+- Order milestones by dependency.
+- Make the roadmap practical and industry-oriented.
+- The final milestone must be a realistic portfolio/project milestone.
+- Give each milestone a realistic duration.
+- Give a concrete proof-of-work task.
+- Give one realistic interview checkpoint.
+- Make recommendations relevant to the target company type.
+
+Return ONLY valid JSON in this format:
+
+{
+  "steps": [
+    {
+      "title": "string",
+      "duration": "string",
+      "proofOfWork": "string",
+      "interviewCheckpoint": "string"
+    }
+  ]
+}
+`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${API_KEY}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              steps: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: {
+                      type: "string"
+                    },
+                    duration: {
+                      type: "string"
+                    },
+                    proofOfWork: {
+                      type: "string"
+                    },
+                    interviewCheckpoint: {
+                      type: "string"
+                    }
+                  },
+                  required: [
+                    "title",
+                    "duration",
+                    "proofOfWork",
+                    "interviewCheckpoint"
+                  ]
+                }
+              }
+            },
+            required: ["steps"]
+          }
+        }
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${errorText}`);
+  }
+
+  const result = await response.json();
+
+  const text =
+    result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!text) {
+    throw new Error("Gemini returned an empty response.");
+  }
+
+  const parsed = JSON.parse(text);
+
+  const known = knownSkills
+    .toLowerCase()
+    .split(",")
+    .map(skill => skill.trim())
+    .filter(Boolean);
+
+  const steps = parsed.steps || [];
+
   const nodes = steps.map((step, index) => {
-    const isKnown = known.some(k => k && (step.title.toLowerCase().includes(k) || step.keyword.includes(k)));
+    const titleLower = step.title.toLowerCase();
+
+    const isKnown = known.some(
+      skill =>
+        skill &&
+        (
+          titleLower.includes(skill) ||
+          skill.includes(titleLower)
+        )
+    );
+
     return {
       id: String(index + 1),
-      position: { x: 250, y: index * 120 },
+
+      position: {
+        x: 250,
+        y: index * 140
+      },
+
       data: {
         title: step.title,
+        
         duration: isKnown ? "Already Known" : step.duration,
-        status: isKnown ? "completed" : "pending"
+originalDuration: step.duration,
+        status: isKnown ? "completed" : "pending",
+        proofOfWork: step.proofOfWork,
+        interviewCheckpoint: step.interviewCheckpoint
       },
+
       type: "custom"
     };
   });
 
-  // Add final Target Node
+  // Final target node
   nodes.push({
     id: String(nodes.length + 1),
-    position: { x: 250, y: nodes.length * 120 },
+
+    position: {
+      x: 250,
+      y: nodes.length * 140
+    },
+
     data: {
       title: `${role} (${company})`,
       duration: "Target Goal",
       status: "target"
     },
+
     type: "custom"
   });
 
-  // Dynamically generate edges
+  // Connect roadmap nodes
   const edges = [];
+
   for (let i = 0; i < nodes.length - 1; i++) {
     edges.push({
       id: `e${nodes[i].id}-${nodes[i + 1].id}`,
@@ -87,5 +189,8 @@ export async function generateRoadmap(userInput) {
     });
   }
 
-  return { nodes, edges };
+  return {
+    nodes,
+    edges
+  };
 }
