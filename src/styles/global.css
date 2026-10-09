@@ -186,3 +186,9 @@ button { border: 0; }
   background-color: #0b0e16;
   color: #e5edf7;
 }
+.side-panel {
+  max-height: 100vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding-bottom: 24px;
+}
