@@ -123,7 +123,41 @@ export default function RoadmapView({ data, onBack }) {
             {selectedNode.data.status === 'completed' ? 'Completed' : 'Pending'}
           </div>
 
-          <div className="detail-card">
+{selectedNode.data.whyItMatters && (
+  <div className="detail-card">
+    <div className="detail-icon">
+      <Sparkles size={15} />
+    </div>
+    <div>
+      <div className="detail-label">Why this matters</div>
+      <p>{selectedNode.data.whyItMatters}</p>
+    </div>
+  </div>
+)}
+
+{selectedNode.data.actionPlan && (
+  <div className="detail-card">
+    <div className="detail-icon">
+      <Zap size={15} />
+    </div>
+    <div>
+      <div className="detail-label">Action plan</div>
+      <p>{selectedNode.data.actionPlan}</p>
+    </div>
+  </div>
+)}
+
+{selectedNode.data.prerequisites?.length > 0 && (
+  <div className="detail-card">
+    <div className="detail-icon gold">
+      <Target size={15} />
+    </div>
+    <div>
+      <div className="detail-label">Prerequisites</div>
+      <p>{selectedNode.data.prerequisites.join(' → ')}</p>
+    </div>
+  </div>
+)}          <div className="detail-card">
             <div className="detail-icon"><Zap size={15} /></div>
             <div>
               <div className="detail-label">Proof of work</div>

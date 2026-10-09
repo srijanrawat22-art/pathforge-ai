@@ -18,16 +18,18 @@ export default function App() {
   const data = await generateRoadmap(formData);
   setRoadmapData(data);
   setAppState('roadmap');
-} catch (error) {
-  console.warn("Gemini unavailable, using demo roadmap:", error);
+  } catch (error) {
+  console.error("Roadmap generation failed:", error);
 
-  setRoadmapData({
-    nodes: initialNodes,
-    edges: initialEdges
-  });
+  setErrorMsg(
+    error instanceof Error
+      ? error.message
+      : "Something went wrong while generating your roadmap."
+  );
 
-  setAppState('roadmap');
+  setAppState('error');
 }
+
     
   };
 

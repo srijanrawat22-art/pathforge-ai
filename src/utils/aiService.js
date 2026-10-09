@@ -1,183 +1,279 @@
+
 const API_KEY = import.meta.env.VITE_AI_API_KEY;
 
-export async function generateRoadmap(userInput) {
-  const role = userInput.role || "Software Engineer";
-  const company = userInput.company || "Tech Startup";
-  const knownSkills = userInput.knownSkills || "None provided";
+// Use a model currently available to your Google AI Studio API key.
+const MODEL = "gemini-3.5-flash-lite";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function generateRoadmap(userInput = {}) {
+  const role = userInput.role?.trim() || "Software Engineer";
+  const company = userInput.company?.trim() || "Tech Startup";
+  const knownSkills = userInput.knownSkills?.trim() || "None specified";
+  const education = userInput.education?.trim() || "Not specified";
+  const currentYear = userInput.currentYear?.trim() || "Not specified";
+  const hoursPerWeek = userInput.hoursPerWeek || "Not specified";
+  const targetTimeline = userInput.targetTimeline || "Flexible";
 
   if (!API_KEY || API_KEY === "your-api-key-here") {
-    throw new Error("Gemini API key is missing.");
+    throw new Error("Gemini API key is missing. Check your .env.local file.");
   }
 
   const prompt = `
-You are PathForge AI, an expert career roadmap planner.
+You are PathForge AI, a realistic career strategist and technical mentor.
 
-Create a realistic career roadmap for:
+Create a personalized, dependency-aware career roadmap.
 
-Target Role: ${role}
-Target Company Type: ${company}
-Current Skills: ${knownSkills}
+USER PROFILE
+- Target role: ${role}
+- Target company/type: ${company}
+- Education: ${education}
+- Current year/semester: ${currentYear}
+- Existing skills: ${knownSkills}
+- Available study time: ${hoursPerWeek} hours per week
+- Target timeline: ${targetTimeline}
 
-Create exactly 6 milestones.
+RULES
+1. Generate exactly 6 ordered learning milestones.
+2. Start at the user's actual level. Do not assume a college student is a beginner
+   or that a school student already knows advanced programming.
+3. Use the stated education and skills to choose an appropriate starting point.
+4. Avoid repeating skills the user already knows unless a short assessment is useful.
+5. Make every milestone specific to the target role and company type.
+6. Progress from prerequisites to advanced skills, practical experience and job readiness.
+7. Make durations realistic given the hours available per week.
+8. Every milestone must include:
+   - A precise, meaningful title.
+   - Why it matters for this career goal.
+   - A concrete action plan.
+   - A project or other proof of work.
+   - An interview checkpoint or measurable success criterion.
+   - Required prerequisite milestone titles, if any.
+9. Recommend real technologies and relevant, verifiable certifications only when useful.
+   Never invent certifications, URLs, job openings or employer requirements.
+10. Make projects demonstrate the actual skills required for the target role.
+11. The sixth milestone must be a substantial portfolio project or job-readiness milestone.
+12. Do not guarantee employment or invent a precise hiring timeline.
+13. Use clear language suitable for a student. Avoid vague advice such as
+    "learn coding", "build projects", or "improve skills".
+14. Return valid JSON only, matching the requested schema.
+15. Choose technologies and projects based on the actual target role.
+    Do not confuse ML Engineering with quantitative trading, frontend
+    development, data analytics, or other adjacent careers.
 
-Requirements:
-- Start from the user's current level.
-- Avoid repeating skills the user already knows.
-- Order milestones by dependency.
-- Make the roadmap practical and industry-oriented.
-- The final milestone must be a realistic portfolio/project milestone.
-- Give each milestone a realistic duration.
-- Give a concrete proof-of-work task.
-- Give one realistic interview checkpoint.
-- Make recommendations relevant to the target company type.
+16. For ML Engineer roles, prioritize relevant foundations, mathematics
+    and statistics, data preparation, machine learning algorithms,
+    model evaluation, deployment, and monitoring. Adapt this sequence
+    to the user's existing skills and target industry.
 
-Return ONLY valid JSON in this format:
+17. Make every project directly demonstrate a required competency.
+    For fintech ML, consider realistic problems such as fraud detection,
+    credit-risk prediction, or transaction anomaly detection.
 
-{
-  "steps": [
-    {
-      "title": "string",
-      "duration": "string",
-      "proofOfWork": "string",
-      "interviewCheckpoint": "string"
-    }
-  ]
-}
+18. Never suggest extreme or arbitrary performance targets, such as
+    processing millions of trades per second, unless the target role
+    explicitly requires that capability.
+
+19. Treat listed skills as self-reported familiarity, not proof of mastery.
+    Avoid beginner repetition, but use practical assessments where useful.
+
+20. Ensure total milestone durations are consistent with the user's
+    available weekly hours and target timeline. If the timeline is
+    unrealistic, explain the constraint in an appropriate milestone.
+
+21. Make every action plan concrete. Specify what to study, what to
+    implement, and what measurable result demonstrates completion.
+    Avoid generic advice and unrelated technologies.
+
+22. Every prerequisite must refer to an earlier milestone or a clearly
+    stated existing competency.
+    23. For ML engineering, include probability, statistics, and relevant
+    linear algebra when the user's current level requires them.
+24. For fintech ML projects, address class imbalance, data leakage,
+    model calibration, precision-recall trade-offs, and explainability
+    where relevant.
+25. Every project must define measurable evaluation criteria and explain
+    how results will be validated on unseen data.
+
+Make the roadmap meaningfully different for different target roles.
 `;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "object",
-            properties: {
-              steps: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    title: {
-                      type: "string"
-                    },
-                    duration: {
-                      type: "string"
-                    },
-                    proofOfWork: {
-                      type: "string"
-                    },
-                    interviewCheckpoint: {
-                      type: "string"
-                    }
-                  },
-                  required: [
-                    "title",
-                    "duration",
-                    "proofOfWork",
-                    "interviewCheckpoint"
-                  ]
-                }
-              }
-            },
-            required: ["steps"]
-          }
+  const responseSchema = {
+    type: "OBJECT",
+    properties: {
+      steps: {
+        type: "ARRAY",
+        minItems: 6,
+        maxItems: 6,
+        items: {
+          type: "OBJECT",
+          properties: {
+            title: { type: "STRING" },
+            duration: { type: "STRING" },
+            whyItMatters: { type: "STRING" },
+            actionPlan: { type: "STRING" },
+            proofOfWork: { type: "STRING" },
+            interviewCheckpoint: { type: "STRING" },
+            prerequisites: {
+              type: "ARRAY",
+              items: { type: "STRING" }
+            }
+          },
+          required: [
+            "title",
+            "duration",
+            "whyItMatters",
+            "actionPlan",
+            "proofOfWork",
+            "interviewCheckpoint",
+            "prerequisites"
+          ],
+          propertyOrdering: [
+            "title",
+            "duration",
+            "whyItMatters",
+            "actionPlan",
+            "proofOfWork",
+            "interviewCheckpoint",
+            "prerequisites"
+          ]
         }
-      })
-    }
-  );
+      }
+    },
+    required: ["steps"]
+  };
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API error: ${errorText}`);
+  let result;
+
+  // Retry temporary rate-limit and server errors, not invalid requests.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let response;
+
+    try {
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema,
+              temperature: 0.4
+            }
+          })
+        }
+      );
+    } catch {
+      if (attempt === 2) {
+        throw new Error("Network error. Check your connection and try again.");
+      }
+      await sleep(1000 * (attempt + 1));
+      continue;
+    }
+
+    if (response.ok) {
+      result = await response.json();
+      break;
+    }
+
+    const errorBody = await response.json().catch(() => ({}));
+    const status = response.status;
+
+    if (status === 429 || status >= 500) {
+      if (attempt < 2) {
+        const retryDelay = Math.min(1500 * (2 ** attempt), 5000);
+        await sleep(retryDelay);
+        continue;
+      }
+    }
+
+    if (status === 429) {
+      throw new Error(
+        "Gemini is rate-limited. Please wait a little and try again."
+      );
+    }
+
+    if (status === 401 || status === 403) {
+      throw new Error(
+        "Gemini rejected the API key. Check the key and API permissions."
+      );
+    }
+
+    throw new Error(
+      errorBody?.error?.message || `Gemini request failed (${status}).`
+    );
   }
 
-  const result = await response.json();
-
-  const text =
-    result?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = result?.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || "")
+    .join("")
+    .trim();
 
   if (!text) {
-    throw new Error("Gemini returned an empty response.");
+    throw new Error("Gemini returned no roadmap. Please try again.");
   }
 
-  const parsed = JSON.parse(text);
+  let parsed;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Gemini returned an invalid roadmap. Please try again.");
+  }
+
+  if (!Array.isArray(parsed.steps) || parsed.steps.length !== 6) {
+    throw new Error("The generated roadmap was incomplete. Please try again.");
+  }
 
   const known = knownSkills
     .toLowerCase()
     .split(",")
-    .map(skill => skill.trim())
+    .map((skill) => skill.trim())
     .filter(Boolean);
 
-  const steps = parsed.steps || [];
-
-  const nodes = steps.map((step, index) => {
+    
+  const nodes = parsed.steps.map((step, index) => {
     const titleLower = step.title.toLowerCase();
 
     const isKnown = known.some(
-      skill =>
-        skill &&
-        (
-          titleLower.includes(skill) ||
-          skill.includes(titleLower)
-        )
+      (skill) =>
+        titleLower.includes(skill) ||
+        (skill.length > 2 && skill.includes(titleLower))
     );
 
     return {
       id: String(index + 1),
-
-      position: {
-        x: 250,
-        y: index * 140
-      },
-
+      position: { x: 250, y: index * 160 },
       data: {
         title: step.title,
-        
         duration: isKnown ? "Already Known" : step.duration,
-originalDuration: step.duration,
+        originalDuration: step.duration,
         status: isKnown ? "completed" : "pending",
+        whyItMatters: step.whyItMatters,
+        actionPlan: step.actionPlan,
         proofOfWork: step.proofOfWork,
-        interviewCheckpoint: step.interviewCheckpoint
+        interviewCheckpoint: step.interviewCheckpoint,
+        prerequisites: step.prerequisites || []
       },
-
       type: "custom"
     };
   });
 
-  // Final target node
+  const targetId = String(nodes.length + 1);
+
   nodes.push({
-    id: String(nodes.length + 1),
-
-    position: {
-      x: 250,
-      y: nodes.length * 140
-    },
-
+    id: targetId,
+    position: { x: 250, y: nodes.length * 160 },
     data: {
       title: `${role} (${company})`,
       duration: "Target Goal",
       status: "target"
     },
-
     type: "custom"
   });
 
-  // Connect roadmap nodes
   const edges = [];
 
   for (let i = 0; i < nodes.length - 1; i++) {
@@ -189,8 +285,5 @@ originalDuration: step.duration,
     });
   }
 
-  return {
-    nodes,
-    edges
-  };
+  return { nodes, edges };
 }
