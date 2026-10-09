@@ -174,3 +174,15 @@ button { border: 0; }
   .roadmap-badge { top: 94px; left: 16px; }
   .side-panel { padding: 20px; }
 }
+
+/* Improve dropdown readability */
+.landing-form-card select.input-field {
+  color-scheme: dark;
+  color: #e5edf7;
+  background-color: #0b0e16;
+}
+
+.landing-form-card select.input-field option {
+  background-color: #0b0e16;
+  color: #e5edf7;
+}
